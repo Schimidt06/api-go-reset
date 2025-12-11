@@ -10,10 +10,10 @@ import (
 
 func HandleRequests() {
 	r := mux.NewRouter()
-	
-    // 2. Correção abaixo: removemos o ".http" extra
-	r.HandleFunc("/", controllers.Home) 
-	r.HandleFunc("/api/personalidades", controllers.TodasPersonalidades)
 
+	// 2. Correção abaixo: removemos o ".http" extra
+	r.HandleFunc("/", controllers.Home)
+	r.HandleFunc("/api/personalidades", controllers.TodasPersonalidades).Methods("GET")
+	r.HandleFunc("/api/personalidades/{id}", controllers.RetornaUmaPersonalidade).Methods("GET")
 	log.Fatal(http.ListenAndServe(":8080", r))
 }
