@@ -1,22 +1,39 @@
-version: '3'
-services:
+version: '3' # Versão da sintaxe do Docker Compose.
+
+services: # Aqui definimos os "computadores" que vamos subir.
+
+  # --- SERVIÇO 1: O BANCO DE DADOS ---
   postgres:
-    image: "postgres"
+    image: "postgres" # Baixa a imagem oficial mais recente do PostgreSQL do Docker Hub.
     environment:
+      # [SEGURANÇA] Credenciais definidas via variáveis de ambiente.
+      # Nota: Em produção, nunca deixamos fixo assim (usamos .env), mas para dev está ok.
       - POSTGRES_USER=root
       - POSTGRES_PASSWORD=root
       - POSTGRES_DB=root      
     ports:
+      # Mapeamento de Portas: "Porta do Seu PC : Porta do Container"
+      # Isso permite que seu Go (rodando no Windows) acesse o banco no container.
       - "5432:5432"
     volumes:
+      # [A MÁGICA DA AUTOMAÇÃO]
+      # Você está pegando o arquivo SQL do seu computador (./migration/...)
+      # e jogando dentro da pasta especial de inicialização do container.
+      # Resultado: Quando o banco ligar pela primeira vez, ele roda aquele CREATE TABLE sozinho!
       - ./migration/docker-database-initial.sql:/docker-entrypoint-initdb.d/docker-database-initial.sql   
 
+  # --- SERVIÇO 2: A INTERFACE VISUAL ---
   pgadmin-compose:
-    image: dpage/pgadmin4
+    image: dpage/pgadmin4 # A melhor interface web para gerenciar Postgres.
     environment:
+      # Login para acessar o painel web do PgAdmin
       PGADMIN_DEFAULT_EMAIL: "jpschimidtfuentes@gmail.com"
       PGADMIN_DEFAULT_PASSWORD: "123456"
     ports:
+      # Mapeamento: Você acessa "localhost:54321" no navegador,
+      # e o Docker redireciona para a porta 80 (web) interna do pgAdmin.
       - "54321:80"
     depends_on:
+      # Ordem de Boot: Garante que o pgAdmin só tente subir se o Postgres já tiver iniciado.
+      # (Nota: Ele espera o container iniciar, não necessariamente o banco estar pronto para conexão).
       - postgres
