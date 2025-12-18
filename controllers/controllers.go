@@ -1,90 +1,128 @@
 package controllers
 
 import (
-    "api/rest/database" // Importa nossa conexão com o banco (GORM)
-    "api/rest/models"   // Importa a estrutura (Struct) da tabela Personalidade
-    "encoding/json"     // Lib nativa para traduzir Go <-> JSON
-    "fmt"
-    "net/http"          // Lib nativa para gerenciar requisições e respostas web
+	"api/rest/database" // Camada de acesso ao banco de dados (GORM já configurado)
+	"api/rest/models"   // Modelos que representam as tabelas do banco (Structs)
+	"encoding/json"     // Biblioteca padrão para conversão entre Go <-> JSON
+	"fmt"
+	"net/http"          // Base do servidor HTTP: Request, Response, Status Codes
 
-    "github.com/gorilla/mux" // Roteador poderoso para capturar variáveis na URL
+	"github.com/gorilla/mux" // Roteador HTTP para rotas dinâmicas (path params)
 )
 
-// Home: A porta de entrada da API.
-// w (ResponseWriter): É onde "escrevemos" a resposta que vai para o navegador/cliente.
-// r (Request): Contém todos os dados que chegaram (cabeçalhos, corpo, IP, etc).
+
+// Home
+// Responsável por responder a rota raiz da API.
+// Normalmente usada como health check ou endpoint inicial.
 func Home(w http.ResponseWriter, r *http.Request) {
-    // Fprintf escreve uma string formatada diretamente na saída HTTP.
-    fmt.Fprintln(w, "Welcome to the Home Page!")
+	// Escreve diretamente na resposta HTTP
+	// Ideal para testes rápidos de funcionamento da API
+	fmt.Fprintln(w, "Welcome to the Home Page!")
 }
 
-// TodasPersonalidades: Busca TUDO no banco (equivalente a um SELECT *).
+
+// TodasPersonalidades
+// Retorna todos os registros da tabela Personalidade.
+// Equivalente ao comando SQL: SELECT * FROM personalidades
 func TodasPersonalidades(w http.ResponseWriter, r *http.Request) {
-    // 1. Criação do Slice (Lista):
-    // Em Go, 'var p []...' cria um slice vazio que vai receber vários registros.
-    // É como um TList ou Array dinâmico no Delphi/C#.
-    var p []models.Personalidade
 
-    // 2. A Mágica do Ponteiro (&):
-    // Passamos '&p' (o endereço de memória) para o GORM.
-    // O GORM precisa do endereço para preencher a variável original com os dados do banco.
-    database.DB.Find(&p)
+	// Slice que armazenará múltiplos registros retornados do banco
+	// Slice é dinâmico e cresce conforme o GORM popula os dados
+	var personalidades []models.Personalidade
 
-    // 3. Serialização (Marshalling):
-    // Cria um Encoder que joga dados na resposta (w) e codifica o slice 'p' para JSON.
-    json.NewEncoder(w).Encode(p)
+	// Executa a consulta no banco
+	// Passamos o endereço de memória (&) para que o GORM consiga
+	// preencher a variável original com os dados retornados
+	database.DB.Find(&personalidades)
+
+	// Converte automaticamente o slice Go em JSON
+	// e escreve o resultado na resposta HTTP
+	json.NewEncoder(w).Encode(personalidades)
 }
 
-// RetornaUmaPersonalidade: Busca um único registro baseado no ID da URL.
+
+// RetornaUmaPersonalidade
+// Busca um único registro com base no ID informado na URL.
+// Exemplo de rota: /api/personalidades/{id}
 func RetornaUmaPersonalidade(w http.ResponseWriter, r *http.Request) {
-    // 1. Captura de Variáveis:
-    // O Mux extrai os parâmetros definidos na rota (ex: /api/personalidades/{id}).
-    vars := mux.Vars(r)
-    id := vars["id"]
 
-    // 2. Instância Única:
-    // Aqui criamos uma struct vazia, não um slice, pois esperamos apenas 1 resultado.
-    var Personalidade models.Personalidade
+	// Captura os parâmetros dinâmicos da rota
+	// O mux transforma {id} da URL em um map
+	vars := mux.Vars(r)
+	id := vars["id"]
 
-    // 3. Busca com Filtro (WHERE id = ?):
-    // O método .First() busca o primeiro registro que coincida com o 'id' passado.
-    // Novamente, passamos o endereço de memória (&Personalidade) para ser preenchido.
-    database.DB.First(&Personalidade, id)
+	// Struct única, pois esperamos apenas um registro
+	var personalidade models.Personalidade
 
-    // 4. Retorno:
-    json.NewEncoder(w).Encode(Personalidade)
+	// Consulta no banco buscando o primeiro registro
+	// cujo ID corresponda ao valor informado
+	// Internamente gera: SELECT * FROM personalidades WHERE id = ? LIMIT 1
+	database.DB.First(&personalidade, id)
+
+	// Retorna o objeto encontrado em formato JSON
+	json.NewEncoder(w).Encode(personalidade)
 }
 
-// CriaUmaNovaPersonalidade: Recebe JSON do cliente e salva no banco.
+
+// CriaUmaNovaPersonalidade
+// Recebe um JSON via corpo da requisição e cria um novo registro no banco.
 func CriaUmaNovaPersonalidade(w http.ResponseWriter, r *http.Request) {
-    var novaPersonalidade models.Personalidade
 
-    // 1. Deserialização (Unmarshalling):
-    // NewDecoder pega o 'r.Body' (o JSON cru que veio na requisição).
-    // .Decode(&...) converte esse JSON para a struct Go e preenche a variável.
-    json.NewDecoder(r.Body).Decode(&novaPersonalidade)
+	// Struct que irá receber os dados enviados pelo cliente
+	var novaPersonalidade models.Personalidade
 
-    // 2. Persistência:
-    // O comando .Create() gera o INSERT no banco de dados.
-    database.DB.Create(&novaPersonalidade)
+	// Decodifica o JSON do corpo da requisição
+	// e preenche automaticamente a struct Go
+	json.NewDecoder(r.Body).Decode(&novaPersonalidade)
 
-    // 3. Confirmação:
-    // Devolvemos o objeto criado (agora com ID gerado) para confirmar que deu certo.
-    json.NewEncoder(w).Encode(novaPersonalidade)
+	// Persiste os dados no banco
+	// Gera internamente um INSERT
+	database.DB.Create(&novaPersonalidade)
+
+	// Retorna o objeto salvo, geralmente já contendo ID gerado pelo banco
+	json.NewEncoder(w).Encode(novaPersonalidade)
 }
 
-// DeletaUmaPersonalidade: Remove um registro baseado no ID.
+
+// DeletaUmaPersonalidade
+// Remove um registro do banco com base no ID informado na URL.
 func DeletaUmaPersonalidade(w http.ResponseWriter, r *http.Request) {
-    // Captura o ID da URL
-    vars := mux.Vars(r)
-    id := vars["id"]
 
-    var Personalidade models.Personalidade
+	// Captura o ID vindo da rota
+	vars := mux.Vars(r)
+	id := vars["id"]
 
-    // O comando .Delete() executa o DELETE FROM personalidades WHERE id = X.
-    // O GORM precisa da struct para saber qual tabela usar, e do ID para saber quem apagar.
-    database.DB.Delete(&Personalidade, id)
+	// Struct necessária para que o GORM saiba qual tabela utilizar
+	var personalidade models.Personalidade
 
-    // Retorna o objeto (geralmente vazio ou com dados residuais) como confirmação técnica.
-    json.NewEncoder(w).Encode(Personalidade)
+	// Executa o DELETE
+	// Internamente: DELETE FROM personalidades WHERE id = ?
+	database.DB.Delete(&personalidade, id)
+
+	// Retorno técnico para confirmar a operação
+	json.NewEncoder(w).Encode(personalidade)
+}
+
+
+// EditaUmaPersonalidade
+// Atualiza um registro existente com base no ID.
+func EditaUmaPersonalidade(w http.ResponseWriter, r *http.Request) {
+
+	// Captura o ID da URL
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	// Busca o registro existente no banco
+	var personalidade models.Personalidade
+	database.DB.First(&personalidade, id)
+
+	// Sobrescreve os campos da struct com os dados recebidos no JSON
+	json.NewDecoder(r.Body).Decode(&personalidade)
+
+	// Salva as alterações
+	// O GORM identifica que é um UPDATE pois o ID já existe
+	database.DB.Save(&personalidade)
+
+	// Retorna o objeto atualizado
+	json.NewEncoder(w).Encode(personalidade)
 }
