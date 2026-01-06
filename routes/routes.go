@@ -1,30 +1,48 @@
 package routes
 
 import (
-    "api/rest/controllers"
-    "log"
-    "net/http"
-    "github.com/gorilla/mux"
+	"api/rest/controllers"
+	"api/rest/middleware" // Importa o nosso novo pacote de middleware
+	"log"
+	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
-func HandleResquests() { // Lembra de arrumar o nome para HandleRequests depois ;)
-    r := mux.NewRouter()
+func HandleResquests() {
+	// Inicializa o roteador do Gorilla Mux
+	r := mux.NewRouter()
 
-    r.HandleFunc("/", controllers.Home)
-    r.HandleFunc("/api/personalidades", controllers.TodasPersonalidades).Methods("Get")
-    r.HandleFunc("/api/personalidades/{id}", controllers.RetornaUmaPersonalidade).Methods("Get")
-    r.HandleFunc("/api/personalidades", controllers.CriaUmaNovaPersonalidade).Methods("Post")
-    r.HandleFunc("/api/personalidades/{id}", controllers.DeletaUmaPersonalidade).Methods("Delete")
+	// [NOVO] Registra o Middleware
+	// O comando r.Use diz ao roteador: "Antes de executar qualquer função abaixo,
+	// passe por essa função primeiro".
+	// Isso garante que TODAS as respostas tenham o "Content-Type: application/json".
+	r.Use(middleware.ContentTypeMiddleware)
 
-    // [CORREÇÃO CRÍTICA] Movi esta linha para CIMA.
-    // 8. Rota de Edição (PUT):
-    // O verbo PUT é o padrão mundial para "Atualizar um recurso existente".
-    // Diferença do POST: POST cria novo. PUT substitui o que já existe.
-    // Ele precisa do {id} na URL para saber QUEM ele vai atualizar.
-    r.HandleFunc("/api/personalidades/{id}", controllers.EditaUmaPersonalidade).Methods("Put")
+	// Rota Home (geralmente usada para verificar se a API está online)
+	r.HandleFunc("/", controllers.Home)
 
-    // 9. Subindo o Servidor (O Ponto Sem Volta):
-    // ATENÇÃO SCHIMIDT: Esta linha TEM que ser a última.
-    // O programa "trava" aqui e fica rodando. Nada escrito abaixo dessa linha será executado.
-    log.Fatal(http.ListenAndServe(":8000", r))
+	// Rotas da API
+	// .Methods("Verb") restringe a rota para aceitar apenas aquele método HTTP específico.
+	// Se alguém tentar fazer um POST na rota de GET, o Mux bloqueia automaticamente.
+
+	// Busca todas
+	r.HandleFunc("/api/personalidades", controllers.TodasPersonalidades).Methods("Get")
+
+	// Busca uma específica (usa {id} como variável)
+	r.HandleFunc("/api/personalidades/{id}", controllers.RetornaUmaPersonalidade).Methods("Get")
+
+	// Cria uma nova
+	r.HandleFunc("/api/personalidades", controllers.CriaUmaNovaPersonalidade).Methods("Post")
+
+	// Deleta
+	r.HandleFunc("/api/personalidades/{id}", controllers.DeletaUmaPersonalidade).Methods("Delete")
+
+	// Edita
+	r.HandleFunc("/api/personalidades/{id}", controllers.EditaUmaPersonalidade).Methods("Put")
+
+	// Inicia o servidor na porta 8000
+	// log.Fatal envolve o comando para que, se o servidor cair ou falhar ao iniciar,
+	// o erro seja mostrado no terminal imediatamente.
+	log.Fatal(http.ListenAndServe(":8000", r))
 }
